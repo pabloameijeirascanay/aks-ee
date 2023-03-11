@@ -1,0 +1,35 @@
+name: Build image and publish to ACR
+
+on: [workflow_dispatch]
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+      runs-on: ubuntu-latest
+      steps:
+      # checkout the repo
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@main
+
+      - name: 'Build and push image'
+        uses: azure/docker-login@v1
+        with:
+          login-server: "${{ secrets.ACR_NAME }}.azurecr.io"
+          username: ${{ secrets.ACR_CLIENT_ID }}
+          password: ${{ secrets.ACR_CLIENT_PASSWORD }}
+      - run: |
+          docker build -t "${{ secrets.ACR_NAME }}.azurecr.io/java-app:latest" ./artifacts/java-app
+          docker push "${{ secrets.ACR_NAME }}.azurecr.io/java-app:latest"
+
+      - name: Replace ACR with the correct name
+        env:
+          ACR_NAME: ${{ secrets.ACR_NAME }}
+        run: |
+          find . -type f -name "java-app.yml" -print0 | xargs -0 sed -i "s/__ACR_NAME__/$ACR_NAME/g"
+
+      - name: Commit and push changes
+        uses: devops-infra/action-commit-push@master
+        with:
+          github_token: ${{ secrets.ACCESS_TOKEN }}
+          commit_message: Replaced ACR with the correct name
